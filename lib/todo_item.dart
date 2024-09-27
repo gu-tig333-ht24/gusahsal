@@ -8,16 +8,16 @@ class TodoItem {
   // Skapa TodoItem från JSON
   factory TodoItem.fromJson(Map<String, dynamic> json) {
     return TodoItem(
-      id: json['id'],
-      task: json['title'],
-      isCompleted: json['done'],
+      id: json['id']?.toString() ?? '',
+      task: json['title'] ?? '', // Ändrat från 'text' till 'title'
+      isCompleted: json['done'] ?? false,
     );
   }
 
   // Konvertera TodoItem till JSON
   Map<String, dynamic> toJson() {
     return {
-      'title': task,
+      'title': task, // Ändrat från 'text' till 'title'
       'done': isCompleted,
     };
   }

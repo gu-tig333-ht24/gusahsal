@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'todo_item.dart';
-import 'dialog_helpers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class TodoList extends StatefulWidget {
@@ -61,36 +60,50 @@ class _TodoListState extends State<TodoList> {
     try {
       final response = await http.get(Uri.parse('$apiUrl?key=$apiKey'));
       if (response.statusCode == 200) {
+        print('API response: ${response.body}');
         final List<dynamic> todoJson = jsonDecode(response.body);
         setState(() {
           _todos = todoJson.map((json) => TodoItem.fromJson(json)).toList();
         });
       } else {
         _showErrorSnackbar('Misslyckades med att ladda todo-listan');
+        print('Statuskod: ${response.statusCode}');
+        print('Svar från servern: ${response.body}');
       }
     } catch (e) {
-      _showErrorSnackbar('Nätverksfel');
+      _showErrorSnackbar('Nätverksfel: $e');
     }
   }
 
   // Lägg till en Todo-item
   void _addTodoItem(String task) async {
-    if (apiKey == null) return;
+    if (apiKey == null) {
+      _showErrorSnackbar('API-nyckel saknas.');
+      return;
+    }
+
+    if (task.isEmpty) {
+      _showErrorSnackbar('Uppgift kan inte vara tom.');
+      return;
+    }
 
     try {
       final response = await http.post(
         Uri.parse('$apiUrl?key=$apiKey'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'title': task, 'done': false}),
+        body: jsonEncode({'title': task}), // Ändrat från 'text' till 'title'
       );
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         _fetchTodos();
       } else {
-        _showErrorSnackbar('Misslyckades med att lägga till todo');
+        _showErrorSnackbar(
+            'Misslyckades med att lägga till todo: ${response.statusCode} ${response.reasonPhrase}');
+        print('Statuskod: ${response.statusCode}');
+        print('Svar från servern: ${response.body}');
       }
     } catch (e) {
-      _showErrorSnackbar('Nätverksfel');
+      _showErrorSnackbar('Nätverksfel: $e');
     }
   }
 
@@ -102,18 +115,24 @@ class _TodoListState extends State<TodoList> {
       final response = await http.put(
         Uri.parse('$apiUrl/${todo.id}?key=$apiKey'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'title': todo.task, 'done': !todo.isCompleted}),
+        body: jsonEncode({
+          'title': todo.task, // Ändrat från 'text' till 'title'
+          'done': !todo.isCompleted,
+        }),
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 204) {
         setState(() {
           _todos[index].isCompleted = !_todos[index].isCompleted;
         });
       } else {
-        _showErrorSnackbar('Misslyckades med att uppdatera todo');
+        _showErrorSnackbar(
+            'Misslyckades med att uppdatera todo: ${response.statusCode} ${response.reasonPhrase}');
+        print('Statuskod: ${response.statusCode}');
+        print('Svar från servern: ${response.body}');
       }
     } catch (e) {
-      _showErrorSnackbar('Nätverksfel');
+      _showErrorSnackbar('Nätverksfel: $e');
     }
   }
 
@@ -126,21 +145,54 @@ class _TodoListState extends State<TodoList> {
         Uri.parse('$apiUrl/${_todos[index].id}?key=$apiKey'),
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 204) {
         setState(() {
           _todos.removeAt(index);
         });
       } else {
-        _showErrorSnackbar('Misslyckades med att ta bort todo');
+        _showErrorSnackbar(
+            'Misslyckades med att ta bort todo: ${response.statusCode} ${response.reasonPhrase}');
+        print('Statuskod: ${response.statusCode}');
+        print('Svar från servern: ${response.body}');
       }
     } catch (e) {
-      _showErrorSnackbar('Nätverksfel');
+      _showErrorSnackbar('Nätverksfel: $e');
     }
   }
 
   // Visa dialog för att lägga till ny Todo
   void _showAddTodoDialog() {
-    showAddTodoDialog(context, (task) => _addTodoItem(task));
+    TextEditingController controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Lägg till Todo'),
+          content: TextField(
+            controller: controller,
+            decoration: InputDecoration(hintText: 'Ange uppgift här'),
+          ),
+          actions: [
+            TextButton(
+              child: Text('Avbryt'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('Lägg till'),
+              onPressed: () {
+                if (controller.text.isNotEmpty) {
+                  _addTodoItem(controller.text);
+                }
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   // Visa felmeddelande
@@ -152,26 +204,30 @@ class _TodoListState extends State<TodoList> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'TIG333 TODO',
           style: TextStyle(color: Colors.grey),
         ),
         backgroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.grey),
+        iconTheme: IconThemeData(color: Colors.grey),
       ),
       body: _buildTodoList(),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddTodoDialog,
-        child: const Icon(Icons.add),
+        child: Icon(Icons.add),
       ),
     );
   }
 
   Widget _buildTodoList() {
     if (_todos.isEmpty) {
-      return const Center(
-        child: Text('Ingen todo att visa'),
+      return Center(
+        child: Text(
+          'Ingen todo att visa',
+          style: TextStyle(color: Colors.black),
+        ),
       );
     } else {
       return ListView.builder(
@@ -184,10 +240,13 @@ class _TodoListState extends State<TodoList> {
   }
 
   Widget _todoItem(TodoItem todo, int index) {
+    print('Todo task at index $index: "${todo.task}"');
+
     return ListTile(
       leading: IconButton(
         icon: Icon(
           todo.isCompleted ? Icons.check_box : Icons.check_box_outline_blank,
+          color: Colors.grey,
         ),
         onPressed: () {
           _toggleCompletion(todo, index);
@@ -196,13 +255,14 @@ class _TodoListState extends State<TodoList> {
       title: Text(
         todo.task,
         style: TextStyle(
+          color: Colors.black,
           decoration: todo.isCompleted
               ? TextDecoration.lineThrough
               : TextDecoration.none,
         ),
       ),
       trailing: IconButton(
-        icon: const Icon(Icons.close),
+        icon: Icon(Icons.close, color: Colors.grey),
         onPressed: () {
           _removeTodoItem(index);
         },
