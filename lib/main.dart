@@ -1,19 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'todo_list.dart';
+import 'todo_provider.dart';
 
 void main() {
-  runApp(const TodoApp());
+  runApp(TodoApp());
 }
 
 class TodoApp extends StatelessWidget {
-  const TodoApp({super.key});
-
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      // Tvinga ljust tema för att undvika påverkan från enhetens inställningar
-      theme: ThemeData.light(),
-      home: const TodoList(),
+    return ChangeNotifierProvider(
+      create: (_) => TodoProvider(),
+      child: MaterialApp(
+        theme: ThemeData.light(),
+        home: TodoList(),
+      ),
     );
   }
 }
